@@ -1,0 +1,117 @@
+/ ********************************
+/ ****** MAILER TEMPLATES  *******
+/ ********************************
+
+/ ****************************************
+/ RIDER MAILER LAYOUT
+/ app/views/layouts/rider_mailer.html.haml
+/ ****************************************
+
+!!!
+%html
+  %head
+    %meta{:content => "text/html; charset=UTF-8", "http-equiv" => "Content-Type"}/
+    :css
+      table { 
+        border-collapse:collapse;
+        margin-left: 2em;
+      }
+      th {
+        background-color: lightgray;
+      }
+      th, td {
+        border: 1px solid black;
+        margin: 0px;
+        padding: .5em;
+      }
+      .underline {
+        text-decoration: underline;
+      }
+  %body
+    %p
+      = @salutation
+    = yield
+
+/ ****************************************
+/ DELEGATION EMAIL TEMPLATE
+/ app/views/layouts/rider_mailer.html.haml
+/ ****************************************
+
+%p
+  = @offering
+%table
+  %tr
+    %th
+      Time
+    %th
+      Restaurant
+  - @shifts.each do |shift|
+    %tr
+      %td
+        = shift.table_time
+      %td
+        = shift.restaurant.name
+%p
+  = @confirmation_request
+
+= render 'mailer/signature'
+= render 'briefs'
+= render 'reminders'
+
+/ ****************************************
+/ SIGNATURE PARTIAL
+/ app/views/mailer/_signature.html.haml
+/ ****************************************
+
+- #Args: @staffer
+%p
+%p
+  Best,
+%p
+  = @staffer.name 
+  %br/
+  = @staffer.title
+  %br/
+  BK Shift, LLC
+  %br/
+  = @staffer.phone
+  %br/
+  = mail_to @staffer.email
+
+/ ****************************************
+/ BRIEFS PARTIAL
+/ app/views/rider_mailer/_briefs.html.haml
+/ ****************************************
+
+%strong.underline
+  Restaurant Briefs:
+- @shifts.each do |shift|
+  - r = shift.restaurant
+  %p
+    %strong 
+      #{r.name}:
+    = r.brief
+    %br/
+    %strong 
+      Location:
+    = r.location.full_address
+
+/ ****************************************
+/ REMINDERS PARTIAL
+/ app/views/rider_mailer/_reminders.html.haml
+/ ****************************************
+
+%strong.underline
+  Reminders:
+%ul
+  %li
+    Don’t forget to text 347-460-6484 2 hrs before your shift
+  %li
+    Please arrive 15 minutes before your scheduled shift
+  %li
+    Please note that the DOT requires the use of helmets, front white light, back red light and a bell and/or whistle.
+
+
+
+
+

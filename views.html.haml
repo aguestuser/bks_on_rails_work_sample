@@ -1,0 +1,399 @@
+/ ***********************
+/ ******** VIEWS ********
+/ ***********************
+
+/ **********************************************
+/ SHIFTS INDEX VIEW
+/ app/views/shifts/index.html.haml
+/ **********************************************
+
+- provide(:title, 'Shifts')
+
+/Arguments
+- if @caller
+  - header_suffix = " for #{@caller_obj.name}"
+  - span = "span8 offset2"
+- else
+  - header_suffix = ""
+  - span = "span10 offset1"
+
+/Header
+%h1= "Shifts" + header_suffix
+/Hot Links
+- if can? :manage, Shift
+  = render 'hot_links', entity: @caller_obj
+/Filters
+.row
+  %div{ class: span+' filters' }
+    = render 'filter_form'
+
+/Batch Edit Form Wrapper
+.row.batch_form
+  = form_tag '/shift/batch_edit', method: :get, class: 'batch' do 
+    /Submit Buttons
+    .center
+      = submit_tag 'Batch Edit', class: 'btn btn-primary'
+      = submit_tag 'Batch Assign', class: 'btn btn-primary' 
+      = submit_tag 'Uniform Assign', class: 'btn btn-primary'
+      = hidden_field_tag :base_path, @base_path
+    /Pagination
+    .center
+      = will_paginate @shifts
+    /Table
+    .row
+      %div{ :class => span }
+        = render 'layouts/table', table: @shift_table
+    /Pagination
+    .center
+      = will_paginate @shifts
+    /Submit Buttons
+    .center
+      = submit_tag 'Batch Edit', class: 'btn btn-primary'
+      = submit_tag 'Batch Assign', class: 'btn btn-primary' 
+    /Hot Links
+    - if can? :manage, Shift
+      %p.center
+        = render 'hot_links', entity: @caller_obj
+
+/ **********************************************
+/ TABLE LAYOUT
+/ app/views/layouts/_table.html.haml
+/ **********************************************
+
+.table
+  /Headers
+  .row.header
+    - table.headers.each_with_index do |header, i|
+      %div{ id: "row_0_col_#{i+1}", :class => "span#{table.spans[i]}" }
+        = sort_if_sortable header
+  /Data Rows
+  - table.rows.each_with_index do |row, i|
+    .row
+      %div{ id: "row_#{i+1}" }
+        /Checkboxes (optional)
+        .checkbox
+          = checkbox_if_checkable row
+        /Cells
+        - row[:cells].each_with_index do |cell, j|
+          %div{ id: "row_#{i+1}_col_#{j+1}", :class => "span#{table.spans[j]}" }
+            = link_if_linkable cell
+        /Action Dropdown
+        .span1.action.dropdown
+          %a.dropdown-toggle{"data-toggle" => "dropdown", :href => "#"}
+            Action
+            %b.caret
+          /Action Options
+          %ul.dropdown-menu
+            - row[:actions].each do |action|
+              %li= link_to action[:val], action[:href], method: action[:method], data: action[:data]
+
+/ **********************************************
+/ BATCH EDIT ASSIGNMENTS VIEW
+/ app/views/assignments/batch_edit.html.haml
+/ **********************************************
+
+
+- provide(:title, 'Batch Assign Shifts')
+
+%h1 Batch Assign Shifts
+.span8.offset2.profile
+  = form_tag '/assignment/batch_edit', method: :post do
+    = render 'shared/batch_error_messages', errors: @errors
+    /Fresh
+    - @assignments.fresh.each_with_index do |wrapped_assignment, i|
+      %div{ id: "assignments_fresh_#{i}" }
+        = render 'batch_fields', assignment: wrapped_assignment.assignment, index: wrapped_assignment.index
+      %hr/
+    /Old
+    = render 'old_assignment_hidden_fields'
+    /Base Path
+    = render 'shared/base_path_field'
+    %p.center
+      = submit_tag 'Save changes', class: 'btn btn-primary'
+
+/ **********************************************
+/ BATCH UNIFORM EDIT ASSIGNMENTS VIEW
+/ app/views/assignments/batch_uniform_edit.html.haml
+/ **********************************************
+
+- provide(:title, 'Uniform Assign Shifts')
+
+%h1 Uniform Assign Shifts
+.span8.offset2.profile
+  = form_tag '/assignment/batch_edit_uniform', method: :post do
+    /Shifts
+    #shifts
+      %h3 Shifts
+      - @shifts.each_with_index do |shift, i|
+        %div{ id: "shifts_#{i}" }
+          %p.shift_box
+            = render 'assignments/shift_include', shift: shift
+          %p.shift_box
+            = render 'assignment_include', assignment: shift.assignment        
+          = hidden_field_tag "shift_ids[]", shift.id
+          = hidden_field_tag "ids[]", shift.assignment.id
+          = hidden_field_tag :base_path, @base_path
+          %hr/
+    /Assignment Form
+    #assignment_form
+      %h3 Assign All Shifts To
+      .row
+        /Rider
+        .span4
+          .center
+            = label_tag :rider
+            = select_tag 'assignment[rider_id]', options_for_select(Rider.select_options, nil ), include_blank: true
+        /Status
+        .span4
+          .center
+            = label_tag :status
+          = select_tag 'assignment[status]', options_for_select(AssignmentStatus.select_options, :proposed)
+      %p.center
+        = submit_tag 'Save changes', class: 'btn btn-primary'
+
+/ **********************************************
+/ ASSIGNMENTS BATCH FILEDS PARTIAL
+/ app/views/assignments/_batch_fields.html.haml
+/ **********************************************
+
+- #args: assignment, index
+- name = lambda { |attr| "wrapped_assignments[fresh][][assignment][#{attr}]" }
+- error_class = @errors.find{ |e| e[:record].shift_id == assignment.shift_id } ? 'field_with_errors' : ''
+
+/Shift Box
+%p.shift_box
+  = render 'assignments/shift_include', shift: assignment.shift
+
+/Index
+= hidden_field_tag "wrapped_assignments[fresh][][index]", index
+
+/Assignment
+.row
+  /Shift
+  = hidden_field_tag name.call('shift_id'), assignment.shift_id
+  %div{ class: error_class }
+    /Rider
+    .span4
+      .center
+        = label_tag :rider
+      - unless @caller == :rider
+        = select_tag name.call('rider_id'), options_for_select(Rider.select_options, assignment.rider.nil? ? nil : assignment.rider.id ), include_blank: true
+      - else 
+        = assignment.rider.name
+    /Status
+    .span4
+      .center
+        = label_tag :status
+      = select_tag name.call('status'), options_for_select(AssignmentStatus.select_options, assignment.status)
+
+/ **********************************************
+/ SHIFT INCLUDE PARTIAL
+/ app/views/assignments/_shift_include.html.haml
+/ **********************************************
+
+#{shift.table_time} @ #{link_to shift.restaurant.mini_contact.name, restaurant_path(shift.restaurant.mini_contact.name)}
+
+/ **********************************************
+/ ASSIGNMENT INCLUDE PARTIAL
+/ app/views/assignments/_assignment_include.html.haml
+/ **********************************************
+
+- #arg: assignment
+
+%strong
+  Assigned to: 
+= (link_to assignment.rider.name, rider_path(assignment.rider)) + " [#{assignment.status.text}]"
+
+
+/ **********************************************
+/ RESOLVE CONFLICTS VIEW
+/ app/views/assignments/resolve_obstacles.html.haml
+/ **********************************************
+
+- #args: Assignments (.with_obstacles, .without_obstacles)
+- provide(title: "Resolve Scheduling Obstacles")
+
+%h1 Resolve Scheduling Obstacles
+.row
+  .span8.offset2.profile
+    = form_tag '/assignment/resolve_obstacles', method: :post do
+      /Assignments
+      = hidden_field_tag :assignments_json, @assignments.to_json
+      /Decisions...
+      /... about Conflicts
+      - if @assignments.with_conflicts.any?
+        %div{ id: "assignments_with_conflicts" }
+          %h3 Assignments With Conflicts
+          - @assignments.with_conflicts.each_with_index do |wrapped_assignment, i|
+            %div{ id: "assignments_with_conflicts_#{i}" }
+              = render 'conflict_alert', assignment: wrapped_assignment.assignment
+              = render 'decision_radios', i: i
+              %p.center
+                %i="(NOTE: Selecting 'Yes' will delete all rider conflicts during this period)"
+              %hr/
+      /... about Double Bookings
+      - if @assignments.with_double_bookings.any?
+        %div{ id: "assignments_with_double_bookings" }
+          %h3 Assignments With Double Bookings
+          - offset = @assignments.with_conflicts.count
+          - @assignments.with_double_bookings.each_with_index do |wrapped_assignment, i|
+            %div{ id: "assignments_with_double_bookings_#{i}" }
+              = render 'double_booking_alert', assignment: wrapped_assignment.assignment
+              = render 'decision_radios', i: i + offset
+              %hr/
+      /Assignemnts Without Obstacles (display only)
+      - if @assignments.without_obstacles.any?
+        %div{ id: "assignments_without_obstacles" }
+          %h3 Assignments Without Obstacles
+          - @assignments.without_obstacles.each_with_index do |wrapped_assignment, i|
+            - assignment = wrapped_assignment.assignment
+            %div{ id: "assignments_without_obstacles_#{i}" }
+              .shift_box
+                = render 'shift_include', shift: assignment.shift
+              .shift_box
+                = render 'assignment_include', assignment: assignment
+              %hr/
+      /Submit
+      %p.center
+        = submit_tag "Submit", class: 'btn btn-primary'
+
+/ **********************************************
+/ CONFLICT ALERT PARTIAL
+/ app/views/assignments/_conflict_alert.html.haml
+/ **********************************************
+
+- a = assignment
+
+%p.shift_box
+  = render 'assignments/shift_include', shift: a.shift
+%p.shift_box
+  = render 'assignments/assignment_include', assignment: a
+.center
+  %strong
+    CONFLICTS WITH:
+%p.shift_box
+  = render 'assignments/conflicts_include', conflicts: a.conflicts
+%p.center
+  %strong
+    Do you want to assign it anyway? 
+
+/ **********************************************
+/ CONFLICTS INCLUDE PARTIAL
+/ app/views/assignments/_conflict_alert.html.haml
+/ **********************************************
+
+- conflicts.each do |conflict|
+  #{conflict.table_time}
+  %br/
+
+/ **********************************************
+/ DOUBLE BOOKING ALERT PARTIAL
+/ app/views/assignments/_double_booking_alert.html.haml
+/ **********************************************
+
+- a = assignment
+
+%p.shift_box
+  = render 'assignments/shift_include', shift: a.shift
+%p.shift_box
+  = render 'assignments/assignment_include', assignment: a
+.center
+  %strong
+    DOUBLE BOOKS WITH:
+%p.shift_box
+  = render 'assignments/double_bookings_include', double_bookings: a.double_bookings
+%p.center
+  %strong
+    Do you want to assign it anyway?
+
+/ **********************************************
+/ DOUBLE BOOKINGS INCLUDE PARTIAL
+/ app/views/assignments/_double_bookings_include.html.haml
+/ **********************************************
+
+- double_bookings.each do |double_booking|
+  = render 'assignments/shift_include', shift: double_booking
+  %br/
+
+/ **********************************************
+/ DECISION RADIOS PARTIAL
+/ app/views/assignments/_decision_radios.html.haml
+/ **********************************************
+
+- #args: i
+.radio
+  = radio_button_tag "decisions[#{i}]", 'Accept', true
+  = label_tag :no
+.radio
+  = radio_button_tag "decisions[#{i}]", 'Override', false
+  = label_tag :yes
+
+- # arg: @assignments (Assignments Obj)
+- provide(title: "Batch Reassign Shifts")
+
+
+/ **********************************************
+/ BATCH REASSIGN VIEW
+/ app/views/assignments/batch_reassign.html.haml
+/ **********************************************
+
+%h1 Batch Reassign Shifts
+
+.row
+  .span8.offset2.profile
+    = form_tag '/assignment/batch_reassign', method: :post do
+      /Requiring Reassignment
+      %div{ id: "assignments_requiring_reassignment" }
+        %h3 Assignments Requiring Reassignment
+        - @assignments.requiring_reassignment.each_with_index do |wrapped_assignment, i|
+          %div{ id: "assignments_requiring_reassignment_#{i}" }
+            .field_with_errors
+              = render 'batch_fields', assignment: wrapped_assignment.assignment, index: wrapped_assignment.index
+          %hr/
+      /No Obstacles
+      - if @assignments.without_obstacles.any?
+        %div{ id: "assignments_without_obstacles" }
+          %h3 Assignments Without Obstacles
+          - @assignments.without_obstacles.each_with_index do |wrapped_assignment, i|
+            - assignment = wrapped_assignment.assignment
+            - index = wrapped_assignment.index
+            %div{ id: "assignments_without_obstacles_#{i}" }
+              .shift_box
+                = render 'shift_include', shift: assignment.shift
+              .shift_box
+                = render 'assignment_include', assignment: assignment
+              = render 'batch_attribute_hidden_fields', assignment: assignment, assignments_key: 'without_obstacles', index: index
+            %hr/
+      /Old
+      = render 'old_assignment_hidden_fields'
+      /Base Path
+      = render 'shared/base_path_field'
+      /Submit
+      %p.center
+        = submit_tag 'Save changes', class: 'btn btn-primary'
+
+/ ***********************************************************
+/ BATCH ATTRIBUTE HIDDEN FIELDS PARTIAL
+/ app/views/assignments/_old_assignment_hidden_fields.html.haml
+/ ***********************************************************
+
+- #arg: assignments_key, assignment, index
+- name = lambda { |attr| "wrapped_assignments[#{assignments_key}][][assignment][#{attr}]" }
+
+/Index
+= hidden_field_tag "wrapped_assignments[#{assignments_key}][][index]", index
+/Assignment
+- assignment.attributes.keys.each do |attr|
+  = hidden_field_tag name.call(attr), assignment.send(attr)
+
+
+/ ***********************************************************
+/ OLD ASSIGNMENTS HIDDEN FIELDS PARTIAL
+/ app/views/assignments/_old_assignment_hidden_fields.html.haml
+/ ***********************************************************
+
+- @assignments.old.each do |wrapped_assignment|
+  = render 'batch_attribute_hidden_fields', assignment: wrapped_assignment.assignment, index: wrapped_assignment.index, assignments_key: 'old'
+
+
+
